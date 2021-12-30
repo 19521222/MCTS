@@ -1,6 +1,7 @@
 import chess
 import copy
 import numpy as np
+import time
 from chess import UNICODE_PIECE_SYMBOLS
 from heuristics import *
 
@@ -20,42 +21,24 @@ def coord_from_pos(num):
     return num // 8, num % 8
 
 class ChessEnv:
-    """
-    Represents a chess environment where a chess game is played/
-    Attributes:
-        :ivar chess.Board board: current board state
-        :ivar int ply: number of half moves performed in total by each player
-        :ivar Winner winner: winner of the game
-        :ivar boolean resigned: whether non-winner resigned
-        :ivar str result: str encoding of the result, 1-0, 0-1, or 1/2-1/2
-    """
     def __init__(self):
-        self.board = None
-        self.resigned = False
-        self.result = None
-        self.legal_moves = None
+        self.board          = None
+        self.resigned       = False
+        self.result         = None
+        self.legal_moves    = None
 
     def reset(self):
-        """
-        Resets to begin a new game
-        :return ChessEnv: self
-        """
-        self.board = chess.Board()
-        self.legal_moves = list(self.board.legal_moves)
-        self.winner = None
-        self.resigned = False
+        self.board              = chess.Board()
+        self.legal_moves        = list(self.board.legal_moves)
+        self.winner             = None
+        self.resigned           = False
         return self
 
     def update(self, board):
-        """
-        Like reset, but resets the position to whatever was supplied for board
-        :param chess.Board board: position to reset to
-        :return ChessEnv: self
-        """
-        self.board = chess.Board(board)
-        self.legal_moves = list(self.board.legal_moves)
-        self.winner = None
-        self.resigned = False
+        self.board              = chess.Board(board)
+        self.legal_moves        = list(self.board.legal_moves)
+        self.winner             = None
+        self.resigned           = False
         return self
 
     @property
@@ -104,11 +87,6 @@ class ChessEnv:
             return 0.5
 
     def step(self, action: str, check_over = True):
-        """
-        Takes an action and updates the game state
-        :param str action: action to take in uci notation
-        :param boolean check_over: whether to check if game is over
-        """
         if check_over and action is None:
             self._resign()
             return
@@ -120,7 +98,6 @@ class ChessEnv:
         self.legal_moves = list(self.board.legal_moves)
 
     def render(self):
-        #print(self.board.unicode())
         fen = self.board.fen().split(" ")[0].split("/")
         print("\n")
         print("  A B C D E F G H")
@@ -148,38 +125,38 @@ class ChessEnv:
                 score += 1 + pawnEvalWhite[y][x]
             elif c == "B":
                 score += 10 + bishopEvalWhite[y][x]
-                attack = self.board.attacks(chess.square(x, y)).tolist()
-                score += sum(np.logical_and(attack, occupancies[0]))
+                # attack = self.board.attacks(chess.square(x, y)).tolist()
+                # score += sum(np.logical_and(attack, occupancies[0]))
             elif c == "N":
                 score += 8 + knightEval[y][x]
             elif c == "R":
                 score += 15 + rookEvalWhite[y][x]
             elif c == "Q":
                 score += 30 + queenEval[y][x]
-                attack = self.board.attacks(chess.square(x, y)).tolist()
-                score += sum(np.logical_and(attack, occupancies[0]))
+                # attack = self.board.attacks(chess.square(x, y)).tolist()
+                # score += sum(np.logical_and(attack, occupancies[0]))
             elif c == "K":
                 score += 200 + kingEvalWhite[y][x]
-                attack = self.board.attacks(chess.square(x, y)).tolist()
-                score += 5 * sum(np.logical_and(attack, occupancies[2]))
+                # attack = self.board.attacks(chess.square(x, y)).tolist()
+                # score += 5 * sum(np.logical_and(attack, occupancies[2]))
             elif c == "p":
                 score -= (1 + pawnEvalBlack[y][x])
             elif c == "b":
                 score -= (10 + bishopEvalBlack[y][x])
-                attack = self.board.attacks(chess.square(x, y)).tolist()
-                score -= sum(np.logical_and(attack, occupancies[0]))
+                # attack = self.board.attacks(chess.square(x, y)).tolist()
+                # score -= sum(np.logical_and(attack, occupancies[0]))
             elif c == "n":
                 score -= (8 + knightEval[y][x])
             elif c == "r":
                 score -= (15 + rookEvalBlack[y][x])
             elif c == "q":
                 score -= (30 + queenEval[y][x])
-                attack = self.board.attacks(chess.square(x, y)).tolist()
-                score -= sum(np.logical_and(attack, occupancies[0]))
+                # attack = self.board.attacks(chess.square(x, y)).tolist()
+                # score -= sum(np.logical_and(attack, occupancies[0]))
             elif c == "k":
                 score -= (200 + kingEvalBlack[y][x])
-                attack = self.board.attacks(chess.square(x, y)).tolist()
-                score -= 5 * sum(np.logical_and(attack, occupancies[1]))
+                # attack = self.board.attacks(chess.square(x, y)).tolist()
+                # score -= 5 * sum(np.logical_and(attack, occupancies[1]))
         
         return score if side else -score
 
@@ -211,6 +188,9 @@ class ChessEnv:
         return alpha
     
     def negamax(self, depth = 2, alpha = -100000, beta = 100000):
+        if self.board.is_game_over():
+            return -9999
+
         pv_len[self.ply] = self.ply
 
         #The Ply out of range
@@ -282,21 +262,21 @@ class ChessEnv:
                 if not self.board.is_capture(move):
                     #If the move is fail high and be a non_capture move
                     #Store its as killer move
-                    killer_moves[1][self.ply] = killer_moves[0][self.ply]
-                    killer_moves[0][self.ply] = move
+                    killer_moves[1][self.ply]   = killer_moves[0][self.ply]
+                    killer_moves[0][self.ply]   = move
                 return beta
             if nodeVal > alpha:
                 if not self.board.is_capture(move):
                     #If the move is pricinple move and be a non_capture move
                     #Store its as history move
-                    f = self.board.piece_type_at(move.from_square)
-                    t = move.to_square
-                    history_moves[f-1][t-1] += depth
+                    f                           = self.board.piece_type_at(move.from_square)
+                    t                           = move.to_square
+                    history_moves[f-1][t-1]     += depth
                 alpha = nodeVal
                 #Store the best move as Principle Variation Move for each ply
-                pv_table[self.ply][self.ply] = move
+                pv_table[self.ply][self.ply]    = move
                 for next in range(self.ply+1, pv_len[self.ply+1]):
-                    pv_table[self.ply][next] = pv_table[self.ply + 1][next]
+                    pv_table[self.ply][next]    = pv_table[self.ply + 1][next]
                 pv_len[self.ply] = pv_len[self.ply + 1]
         return alpha
 
@@ -326,43 +306,34 @@ class ChessEnv:
 
         return 0
 
-    def find_best_move(self, depth):
-        self.follow_pv = 1
-        self.score_pv = 0
-        window_val = 50
-        alpha = -100000
-        beta = 100000
+    def find_best_move(self, depth, detail = False):
+        self.follow_pv  = 1
+        self.score_pv   = 0
+        window_val      = 50
+        alpha           = -100000
+        beta            = 100000
         reset()
 
         for d in range(1, depth + 1):
             self.follow_pv = 1
 
-            #start = time.time()
+            start = time.time()
             score_move = self.negamax(d, alpha, beta)
-            # print('DEPTH:', d)
-            # print("Time:", time.time() - start)
-            # print("Computer Move: {}, Node: {}, Eval: {}".format(
-            #     pv_table[self.ply][self.ply].uci(), 
-            #     NODE, 
-            #     score_move))
+            if detail:
+                print('DEPTH:', d)
+                print("Time:", time.time() - start)
+                print("Computer Move: {}, Eval: {}".format(pv_table[self.ply][self.ply].uci(), score_move))
 
-            # for move in pv_table[self.ply]:
-            #     if move != None:
-            #         print(move, end= ' ')
+                for move in pv_table[self.ply]:
+                    if move != None:
+                        print(move, end= ' ')
 
             if score_move <= alpha or score_move >= beta:
-                alpha = -100000
-                beta = 100000
+                alpha   = -100000
+                beta    = 100000
                 continue
 
-            alpha = score_move - window_val
-            beta = score_move + 50
-
-        # if self.ply >= 100:
-        #     if score_move < -40 and score_move > 40:
-        #         self._resign()
-        #         print('{} resign.'.format(self.board.turn))
-        #         print('Winner:', self.winner)
-        #         return
+            alpha   = score_move - window_val
+            beta    = score_move + 50
 
         return pv_table[self.ply][self.ply].uci()
